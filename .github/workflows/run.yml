@@ -17,7 +17,6 @@ jobs:
           echo "========================================"
           echo "Architecture : $(uname -m)"
           echo "CPU          : $(nproc)"
-          echo ""
           free -h
           echo "========================================"
 
@@ -29,7 +28,6 @@ jobs:
       - name: Verify OpenCode
         run: |
           export PATH="$HOME/.opencode/bin:$PATH"
-          echo "OpenCode:"
           opencode --version
 
       - name: Install SSH Server
@@ -41,7 +39,7 @@ jobs:
           echo "          PREPARE SSH"
           echo "========================================"
 
-          # Dibutuhkan sshd pada Ubuntu
+          # Runtime directory SSH
           sudo mkdir -p /run/sshd
           sudo chmod 755 /run/sshd
 
@@ -49,23 +47,30 @@ jobs:
           mkdir -p "$HOME/.ssh"
           chmod 700 "$HOME/.ssh"
 
-          # Public key dari GitHub Secret
-          echo "${{ secrets.SSH_PUBLIC_KEY }}" \
-            > "$HOME/.ssh/authorized_keys"
-
+          # Public key Termux
+          echo "${{ secrets.SSH_PUBLIC_KEY }}" > "$HOME/.ssh/authorized_keys"
           chmod 600 "$HOME/.ssh/authorized_keys"
 
-          # Host key
-          sudo ssh-keygen -A
-
-          # Config directory
+          # Buat host key sendiri
           mkdir -p "$HOME/sshd"
 
+          ssh-keygen \
+            -t ed25519 \
+            -f "$HOME/sshd/ssh_host_ed25519_key" \
+            -N "" \
+            -q
+
+          chmod 600 "$HOME/sshd/ssh_host_ed25519_key"
+          chmod 644 "$HOME/sshd/ssh_host_ed25519_key.pub"
+
+          echo "Host key berhasil dibuat."
+
+          # SSH config
           cat > "$HOME/sshd/sshd_config" <<EOF
           Port 2222
           ListenAddress 127.0.0.1
 
-          HostKey /etc/ssh/ssh_host_ed25519_key
+          HostKey $HOME/sshd/ssh_host_ed25519_key
 
           PubkeyAuthentication yes
           PasswordAuthentication no
@@ -86,6 +91,7 @@ jobs:
           PidFile $HOME/sshd/sshd.pid
           EOF
 
+          echo ""
           echo "SSH configuration:"
           cat "$HOME/sshd/sshd_config"
 
@@ -102,6 +108,7 @@ jobs:
             -t \
             -f "$HOME/sshd/sshd_config"
 
+          echo ""
           echo "SSH configuration OK."
 
       - name: Start SSH Server
@@ -119,7 +126,15 @@ jobs:
 
           sleep 2
 
-          if ! pgrep -x sshd >/dev/null; then
+          echo ""
+          echo "SSH process:"
+          pgrep -af sshd || true
+
+          echo ""
+          echo "SSH listening:"
+          ss -lntp | grep ':2222' || true
+
+          if ! ss -lnt | grep -q ':2222'; then
             echo ""
             echo "========================================"
             echo "       SSH SERVER GAGAL START"
@@ -128,13 +143,10 @@ jobs:
 
             cat "$HOME/sshd/sshd.log" || true
 
-            echo ""
-            echo "Proses:"
-            ps aux | grep '[s]shd' || true
-
             exit 1
           fi
 
+          echo ""
           echo "SSH server AKTIF."
           echo "Local address: 127.0.0.1:2222"
 
@@ -220,7 +232,9 @@ jobs:
             echo "       BORE TIDAK MENDAPAT PORT"
             echo "========================================"
             echo ""
+
             cat "$HOME/bore.log"
+
             exit 1
           fi
 
