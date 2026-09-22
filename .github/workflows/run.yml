@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
 
     steps:
-      - name: ARM64 Info
+      - name: System Info
         run: |
           echo "=============================="
           echo "ARM64 CLOUD TERMINAL"
@@ -30,7 +30,7 @@ jobs:
           opencode --version
 
       - name: SSH Terminal
-        uses: valeriangalliat/action-sshd-cloudflared@main
+        uses: valeriangalliat/action-sshd-cloudflared@v4
 
       - name: Keep Alive
         run: |
