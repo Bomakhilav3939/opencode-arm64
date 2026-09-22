@@ -4,45 +4,35 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  terminal:
     runs-on: ubuntu-24.04-arm
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Check ARM64
+      - name: System Info
         run: |
-          echo "=== SYSTEM ==="
-          uname -m
+          echo "================================"
+          echo "      ARM64 CLOUD TERMINAL"
+          echo "================================"
           uname -a
+          echo "Architecture: $(uname -m)"
           echo "CPU: $(nproc)"
           free -h
-          echo "================"
+          echo "================================"
 
-      - name: Setup Tmate
-        id: tmate
-        uses: mxschmitt/action-tmate@v3
-        timeout-minutes: 15
-        with:
-          limit-access-to-actor: false
-          detached: true
-          connect-timeout-seconds: 180
-
-      - name: Show SSH Info
+      - name: Install OpenCode
         run: |
-          echo "=============================="
-          echo "SSH COMMAND:"
-          echo "${{ steps.tmate.outputs.ssh-command }}"
-          echo ""
-          echo "SSH ADDRESS:"
-          echo "${{ steps.tmate.outputs.ssh-address }}"
-          echo ""
-          echo "WEB:"
-          echo "${{ steps.tmate.outputs.web-url }}"
-          echo "=============================="
+          curl -fsSL https://opencode.ai/install | bash
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
 
-      - name: Keep Runner Alive
+      - name: Verify OpenCode
+        run: |
+          export PATH="$HOME/.opencode/bin:$PATH"
+          opencode --version
+
+      - name: Start SSH Terminal
+        uses: owenthereal/action-upterm@v1
+
+      - name: Keep Alive
         run: |
           while true; do
             sleep 60
