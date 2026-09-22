@@ -1,0 +1,58 @@
+name: Cloud Terminal ARM64
+
+on:
+  workflow_dispatch:
+
+jobs:
+  terminal:
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Show system
+        run: |
+          echo "=========================================="
+          echo "       GITHUB ARM64 CLOUD TERMINAL"
+          echo "=========================================="
+          uname -a
+          echo "Architecture : $(uname -m)"
+          echo "CPU          : $(nproc)"
+          echo "RAM          : $(free -h | awk '/Mem:/ {print $2}')"
+          echo "=========================================="
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl git tmux tmate
+
+      - name: Install OpenCode
+        run: |
+          curl -fsSL https://opencode.ai/install | bash
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+
+      - name: Verify OpenCode
+        run: |
+          echo "=========================================="
+          echo "OpenCode version:"
+          opencode --version
+          echo "=========================================="
+
+      - name: Start Tmate
+        run: |
+          tmate -S /tmp/tmate.sock new-session -d
+          tmate -S /tmp/tmate.sock wait tmate-ready
+
+          echo ""
+          echo "=========================================="
+          echo "       SSH COMMAND - COPY THIS"
+          echo "=========================================="
+          tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}'
+          echo "=========================================="
+          echo ""
+          echo "Keep this workflow running."
+          echo ""
+
+      - name: Keep terminal alive
+        run: |
+          while true; do
+            sleep 60
+          done
