@@ -8,16 +8,16 @@ jobs:
     runs-on: ubuntu-24.04-arm
 
     steps:
-      - name: System Info
+      - name: ARM64 Info
         run: |
-          echo "================================"
-          echo "      ARM64 CLOUD TERMINAL"
-          echo "================================"
+          echo "=============================="
+          echo "ARM64 CLOUD TERMINAL"
+          echo "=============================="
+          uname -m
           uname -a
-          echo "Architecture: $(uname -m)"
           echo "CPU: $(nproc)"
           free -h
-          echo "================================"
+          echo "=============================="
 
       - name: Install OpenCode
         run: |
@@ -29,8 +29,8 @@ jobs:
           export PATH="$HOME/.opencode/bin:$PATH"
           opencode --version
 
-      - name: Start SSH Terminal
-        uses: owenthereal/action-upterm@v1
+      - name: SSH Terminal
+        uses: valeriangalliat/action-sshd-cloudflared@main
 
       - name: Keep Alive
         run: |
