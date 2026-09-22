@@ -16,13 +16,13 @@ jobs:
           uname -a
           echo "Architecture : $(uname -m)"
           echo "CPU          : $(nproc)"
-          echo "RAM          : $(free -h | awk '/Mem:/ {print $2}')"
+          free -h
           echo "=========================================="
 
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y curl git tmux tmate
+          sudo apt-get install -y curl git openssh-client tmate
 
       - name: Install OpenCode
         run: |
@@ -31,25 +31,44 @@ jobs:
 
       - name: Verify OpenCode
         run: |
-          echo "=========================================="
-          echo "OpenCode version:"
+          export PATH="$HOME/.opencode/bin:$PATH"
+          echo "OpenCode:"
           opencode --version
-          echo "=========================================="
 
       - name: Start Tmate
         run: |
+          set +e
+
+          rm -f /tmp/tmate.sock
+
+          echo "Starting tmate..."
           tmate -S /tmp/tmate.sock new-session -d
-          tmate -S /tmp/tmate.sock wait tmate-ready
+
+          sleep 10
 
           echo ""
           echo "=========================================="
-          echo "       SSH COMMAND - COPY THIS"
+          echo "TMATE STATUS"
           echo "=========================================="
+
+          tmate -S /tmp/tmate.sock list-sessions
+
+          echo ""
+          echo "=========================================="
+          echo "SSH COMMAND"
+          echo "=========================================="
+
           tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}'
+
+          echo ""
           echo "=========================================="
+          echo "SSH COMMAND (WEB)"
+          echo "=========================================="
+
+          tmate -S /tmp/tmate.sock display -p '#{tmate_web}'
+
           echo ""
-          echo "Keep this workflow running."
-          echo ""
+          echo "=========================================="
 
       - name: Keep terminal alive
         run: |
