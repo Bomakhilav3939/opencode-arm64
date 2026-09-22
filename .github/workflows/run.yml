@@ -12,14 +12,14 @@ jobs:
 
       - name: System Info
         run: |
-          echo "======================================"
-          echo "       ARM64 CLOUD TERMINAL"
-          echo "======================================"
-          uname -m
-          uname -a
-          echo "CPU: $(nproc)"
+          echo "========================================"
+          echo "        ARM64 CLOUD TERMINAL"
+          echo "========================================"
+          echo "Architecture : $(uname -m)"
+          echo "CPU          : $(nproc)"
+          echo ""
           free -h
-          echo "======================================"
+          echo "========================================"
 
       - name: Install OpenCode
         run: |
@@ -29,95 +29,193 @@ jobs:
       - name: Verify OpenCode
         run: |
           export PATH="$HOME/.opencode/bin:$PATH"
+
+          echo "OpenCode:"
           opencode --version
 
-      - name: Install SSH Key
+      - name: Install SSH Server
         run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
+          sudo apt-get update
+          sudo apt-get install -y openssh-server
 
-          ssh-keygen \
-            -t ed25519 \
-            -N "" \
-            -f ~/.ssh/id_ed25519
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
 
-          chmod 600 ~/.ssh/id_ed25519
-          chmod 644 ~/.ssh/id_ed25519.pub
+          echo "${{ secrets.SSH_PUBLIC_KEY }}" \
+            > "$HOME/.ssh/authorized_keys"
 
-          echo "SSH key created:"
-          ls -la ~/.ssh/
+          chmod 600 "$HOME/.ssh/authorized_keys"
 
-      - name: Install Upterm
+          sudo ssh-keygen -A
+
+          mkdir -p "$HOME/sshd"
+
+          cat > "$HOME/sshd/sshd_config" <<EOF
+          Port 2222
+          ListenAddress 127.0.0.1
+
+          HostKey /etc/ssh/ssh_host_ed25519_key
+
+          PubkeyAuthentication yes
+          PasswordAuthentication no
+          KbdInteractiveAuthentication no
+
+          AuthorizedKeysFile $HOME/.ssh/authorized_keys
+
+          PermitRootLogin no
+          PermitEmptyPasswords no
+
+          UsePAM no
+
+          X11Forwarding no
+          AllowTcpForwarding no
+          PermitTunnel no
+
+          PrintMotd no
+          EOF
+
+          echo "SSH configuration dibuat."
+
+      - name: Start SSH Server
         run: |
-          VERSION="0.24.0"
+          /usr/sbin/sshd \
+            -f "$HOME/sshd/sshd_config" \
+            -E "$HOME/sshd/sshd.log"
+
+          sleep 2
+
+          if ! pgrep -x sshd >/dev/null; then
+            echo "========================================"
+            echo "       SSH SERVER GAGAL START"
+            echo "========================================"
+
+            cat "$HOME/sshd/sshd.log"
+
+            exit 1
+          fi
+
+          echo "SSH aktif:"
+          echo "127.0.0.1:2222"
+
+      - name: Install Bore
+        run: |
+          mkdir -p "$HOME/bin"
+
+          VERSION="0.6.0"
 
           curl -fL \
-            "https://github.com/owenthereal/upterm/releases/download/v${VERSION}/upterm_linux_arm64.tar.gz" \
-            -o /tmp/upterm.tar.gz
+            "https://github.com/ekzhang/bore/releases/download/v${VERSION}/bore-v${VERSION}-aarch64-unknown-linux-musl.tar.gz" \
+            -o /tmp/bore.tar.gz
 
-          mkdir -p /tmp/upterm
+          mkdir -p /tmp/bore
 
-          tar -xzf /tmp/upterm.tar.gz \
-            -C /tmp/upterm
+          tar -xzf /tmp/bore.tar.gz \
+            -C /tmp/bore
 
-          sudo install -m 755 \
-            /tmp/upterm/upterm \
-            /usr/local/bin/upterm
+          find /tmp/bore -type f -name bore -exec \
+            install -m 755 {} "$HOME/bin/bore" \;
 
-          upterm version
+          echo "$HOME/bin" >> "$GITHUB_PATH"
 
-      - name: Start Upterm
+          echo "Bore:"
+          "$HOME/bin/bore" --version
+
+      - name: Start Bore Tunnel
         run: |
+          export PATH="$HOME/bin:$HOME/.opencode/bin:$PATH"
+
           echo ""
-          echo "======================================"
-          echo "      STARTING UPTERM"
-          echo "======================================"
+          echo "========================================"
+          echo "          STARTING BORE"
+          echo "========================================"
 
-          upterm host --accept > /tmp/upterm.log 2>&1 &
+          bore local \
+            2222 \
+            --to bore.pub \
+            > "$HOME/bore.log" 2>&1 &
 
-          UPTERM_PID=$!
-          echo "$UPTERM_PID" > /tmp/upterm.pid
+          BORE_PID=$!
 
-          echo "Upterm PID: $UPTERM_PID"
-          echo ""
+          echo "$BORE_PID" > "$HOME/bore.pid"
+
+          echo "Bore PID: $BORE_PID"
+
+          PORT=""
 
           for i in $(seq 1 30); do
             sleep 2
 
-            echo "Checking Upterm... $i/30"
+            echo "Menunggu Bore... $i/30"
 
-            if grep -q "SSH:" /tmp/upterm.log; then
+            PORT=$(
+              grep -oE 'bore\.pub:[0-9]+' \
+                "$HOME/bore.log" \
+                | head -n 1 \
+                | cut -d: -f2 || true
+            )
+
+            if [ -n "$PORT" ]; then
               break
             fi
 
-            if ! kill -0 "$UPTERM_PID" 2>/dev/null; then
-              echo "Upterm stopped!"
-              cat /tmp/upterm.log
+            if ! kill -0 "$BORE_PID" 2>/dev/null; then
+              echo ""
+              echo "========================================"
+              echo "           BORE GAGAL START"
+              echo "========================================"
+
+              cat "$HOME/bore.log"
+
               exit 1
             fi
           done
 
-          echo ""
-          echo "======================================"
-          echo "       UPTERM CONNECTION"
-          echo "======================================"
+          if [ -z "$PORT" ]; then
+            echo ""
+            echo "========================================"
+            echo "       BORE TIDAK MENDAPAT PORT"
+            echo "========================================"
 
-          cat /tmp/upterm.log
+            cat "$HOME/bore.log"
 
-          echo ""
-          echo "======================================"
-          echo "       SESSION CURRENT"
-          echo "======================================"
-
-          upterm session current || true
+            exit 1
+          fi
 
           echo ""
-          echo "======================================"
-          echo "       CLOUD TERMINAL READY"
-          echo "======================================"
+          echo "========================================"
+          echo "       ARM64 CLOUD TERMINAL READY"
+          echo "========================================"
+          echo ""
+          echo "HOST : bore.pub"
+          echo "PORT : $PORT"
+          echo ""
+          echo "DARI TERMUX:"
+          echo ""
+          echo "ssh -i ~/.ssh/opencode_arm64 -p $PORT runner@bore.pub"
+          echo ""
+          echo "SETELAH MASUK:"
+          echo ""
+          echo "opencode"
+          echo ""
+          echo "========================================"
+          echo "OpenCode:"
+          opencode --version
+          echo "========================================"
+          echo ""
+
+          echo "Bore log:"
+          cat "$HOME/bore.log"
 
       - name: Keep Runner Alive
         run: |
+          echo ""
+          echo "========================================"
+          echo "        CLOUD TERMINAL AKTIF"
+          echo "========================================"
+          echo ""
+          echo "Jangan hentikan workflow."
+          echo ""
+
           while true; do
             sleep 60
           done
