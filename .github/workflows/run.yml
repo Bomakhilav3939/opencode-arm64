@@ -1,77 +1,16 @@
-name: Cloud Terminal ARM64
+name: ARM64 Cloud Terminal
 
 on:
   workflow_dispatch:
 
 jobs:
-  terminal:
+  build:
     runs-on: ubuntu-24.04-arm
-
     steps:
-      - name: Show system
-        run: |
-          echo "=========================================="
-          echo "       GITHUB ARM64 CLOUD TERMINAL"
-          echo "=========================================="
-          uname -a
-          echo "Architecture : $(uname -m)"
-          echo "CPU          : $(nproc)"
-          free -h
-          echo "=========================================="
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y curl git openssh-client tmate
-
-      - name: Install OpenCode
-        run: |
-          curl -fsSL https://opencode.ai/install | bash
-          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
-
-      - name: Verify OpenCode
-        run: |
-          export PATH="$HOME/.opencode/bin:$PATH"
-          echo "OpenCode:"
-          opencode --version
-
-      - name: Start Tmate
-        run: |
-          set +e
-
-          rm -f /tmp/tmate.sock
-
-          echo "Starting tmate..."
-          tmate -S /tmp/tmate.sock new-session -d
-
-          sleep 10
-
-          echo ""
-          echo "=========================================="
-          echo "TMATE STATUS"
-          echo "=========================================="
-
-          tmate -S /tmp/tmate.sock list-sessions
-
-          echo ""
-          echo "=========================================="
-          echo "SSH COMMAND"
-          echo "=========================================="
-
-          tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}'
-
-          echo ""
-          echo "=========================================="
-          echo "SSH COMMAND (WEB)"
-          echo "=========================================="
-
-          tmate -S /tmp/tmate.sock display -p '#{tmate_web}'
-
-          echo ""
-          echo "=========================================="
-
-      - name: Keep terminal alive
-        run: |
-          while true; do
-            sleep 60
-          done
+      - name: Setup Tmate Debug Session
+        uses: mxschmitt/action-tmate@v3
+        with:
+          limit-access-to-actor: false
