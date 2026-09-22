@@ -6,18 +6,20 @@ on:
 jobs:
   terminal:
     runs-on: ubuntu-24.04-arm
+    timeout-minutes: 360
 
     steps:
+
       - name: System Info
         run: |
-          echo "================================"
-          echo "      ARM64 CLOUD TERMINAL"
-          echo "================================"
+          echo "======================================"
+          echo "       ARM64 CLOUD TERMINAL"
+          echo "======================================"
+          uname -m
           uname -a
-          echo "Architecture: $(uname -m)"
           echo "CPU: $(nproc)"
           free -h
-          echo "================================"
+          echo "======================================"
 
       - name: Install OpenCode
         run: |
@@ -29,10 +31,92 @@ jobs:
           export PATH="$HOME/.opencode/bin:$PATH"
           opencode --version
 
-      - name: Start SSH Terminal
-        uses: owenthereal/action-upterm@v1
+      - name: Install SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
 
-      - name: Keep Alive
+          ssh-keygen \
+            -t ed25519 \
+            -N "" \
+            -f ~/.ssh/id_ed25519
+
+          chmod 600 ~/.ssh/id_ed25519
+          chmod 644 ~/.ssh/id_ed25519.pub
+
+          echo "SSH key created:"
+          ls -la ~/.ssh/
+
+      - name: Install Upterm
+        run: |
+          VERSION="0.24.0"
+
+          curl -fL \
+            "https://github.com/owenthereal/upterm/releases/download/v${VERSION}/upterm_linux_arm64.tar.gz" \
+            -o /tmp/upterm.tar.gz
+
+          mkdir -p /tmp/upterm
+
+          tar -xzf /tmp/upterm.tar.gz \
+            -C /tmp/upterm
+
+          sudo install -m 755 \
+            /tmp/upterm/upterm \
+            /usr/local/bin/upterm
+
+          upterm version
+
+      - name: Start Upterm
+        run: |
+          echo ""
+          echo "======================================"
+          echo "      STARTING UPTERM"
+          echo "======================================"
+
+          upterm host --accept > /tmp/upterm.log 2>&1 &
+
+          UPTERM_PID=$!
+          echo "$UPTERM_PID" > /tmp/upterm.pid
+
+          echo "Upterm PID: $UPTERM_PID"
+          echo ""
+
+          for i in $(seq 1 30); do
+            sleep 2
+
+            echo "Checking Upterm... $i/30"
+
+            if grep -q "SSH:" /tmp/upterm.log; then
+              break
+            fi
+
+            if ! kill -0 "$UPTERM_PID" 2>/dev/null; then
+              echo "Upterm stopped!"
+              cat /tmp/upterm.log
+              exit 1
+            fi
+          done
+
+          echo ""
+          echo "======================================"
+          echo "       UPTERM CONNECTION"
+          echo "======================================"
+
+          cat /tmp/upterm.log
+
+          echo ""
+          echo "======================================"
+          echo "       SESSION CURRENT"
+          echo "======================================"
+
+          upterm session current || true
+
+          echo ""
+          echo "======================================"
+          echo "       CLOUD TERMINAL READY"
+          echo "======================================"
+
+      - name: Keep Runner Alive
         run: |
           while true; do
             sleep 60
