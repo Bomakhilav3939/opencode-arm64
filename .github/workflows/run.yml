@@ -29,7 +29,6 @@ jobs:
       - name: Verify OpenCode
         run: |
           export PATH="$HOME/.opencode/bin:$PATH"
-
           echo "OpenCode:"
           opencode --version
 
@@ -38,16 +37,28 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y openssh-server
 
+          echo "========================================"
+          echo "          PREPARE SSH"
+          echo "========================================"
+
+          # Dibutuhkan sshd pada Ubuntu
+          sudo mkdir -p /run/sshd
+          sudo chmod 755 /run/sshd
+
+          # SSH directory user runner
           mkdir -p "$HOME/.ssh"
           chmod 700 "$HOME/.ssh"
 
+          # Public key dari GitHub Secret
           echo "${{ secrets.SSH_PUBLIC_KEY }}" \
             > "$HOME/.ssh/authorized_keys"
 
           chmod 600 "$HOME/.ssh/authorized_keys"
 
+          # Host key
           sudo ssh-keygen -A
 
+          # Config directory
           mkdir -p "$HOME/sshd"
 
           cat > "$HOME/sshd/sshd_config" <<EOF
@@ -72,12 +83,36 @@ jobs:
           PermitTunnel no
 
           PrintMotd no
+          PidFile $HOME/sshd/sshd.pid
           EOF
 
-          echo "SSH configuration dibuat."
+          echo "SSH configuration:"
+          cat "$HOME/sshd/sshd_config"
+
+      - name: Validate SSH Configuration
+        run: |
+          echo "========================================"
+          echo "       CHECK SSH CONFIGURATION"
+          echo "========================================"
+
+          sudo mkdir -p /run/sshd
+          sudo chmod 755 /run/sshd
+
+          /usr/sbin/sshd \
+            -t \
+            -f "$HOME/sshd/sshd_config"
+
+          echo "SSH configuration OK."
 
       - name: Start SSH Server
         run: |
+          echo "========================================"
+          echo "          STARTING SSH SERVER"
+          echo "========================================"
+
+          sudo mkdir -p /run/sshd
+          sudo chmod 755 /run/sshd
+
           /usr/sbin/sshd \
             -f "$HOME/sshd/sshd_config" \
             -E "$HOME/sshd/sshd.log"
@@ -85,17 +120,23 @@ jobs:
           sleep 2
 
           if ! pgrep -x sshd >/dev/null; then
+            echo ""
             echo "========================================"
             echo "       SSH SERVER GAGAL START"
             echo "========================================"
+            echo ""
 
-            cat "$HOME/sshd/sshd.log"
+            cat "$HOME/sshd/sshd.log" || true
+
+            echo ""
+            echo "Proses:"
+            ps aux | grep '[s]shd' || true
 
             exit 1
           fi
 
-          echo "SSH aktif:"
-          echo "127.0.0.1:2222"
+          echo "SSH server AKTIF."
+          echo "Local address: 127.0.0.1:2222"
 
       - name: Install Bore
         run: |
@@ -112,12 +153,17 @@ jobs:
           tar -xzf /tmp/bore.tar.gz \
             -C /tmp/bore
 
-          find /tmp/bore -type f -name bore -exec \
-            install -m 755 {} "$HOME/bin/bore" \;
+          find /tmp/bore \
+            -type f \
+            -name bore \
+            -exec install -m 755 {} "$HOME/bin/bore" \;
 
           echo "$HOME/bin" >> "$GITHUB_PATH"
 
-          echo "Bore:"
+          echo "========================================"
+          echo "             BORE VERSION"
+          echo "========================================"
+
           "$HOME/bin/bore" --version
 
       - name: Start Bore Tunnel
@@ -163,9 +209,7 @@ jobs:
               echo "========================================"
               echo "           BORE GAGAL START"
               echo "========================================"
-
               cat "$HOME/bore.log"
-
               exit 1
             fi
           done
@@ -175,9 +219,8 @@ jobs:
             echo "========================================"
             echo "       BORE TIDAK MENDAPAT PORT"
             echo "========================================"
-
+            echo ""
             cat "$HOME/bore.log"
-
             exit 1
           fi
 
@@ -197,12 +240,12 @@ jobs:
           echo ""
           echo "opencode"
           echo ""
-          echo "========================================"
           echo "OpenCode:"
           opencode --version
-          echo "========================================"
           echo ""
+          echo "========================================"
 
+          echo ""
           echo "Bore log:"
           cat "$HOME/bore.log"
 
