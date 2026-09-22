@@ -6,11 +6,44 @@ on:
 jobs:
   build:
     runs-on: ubuntu-24.04-arm
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Tmate Debug Session
+      - name: Check ARM64
+        run: |
+          echo "=== SYSTEM ==="
+          uname -m
+          uname -a
+          echo "CPU: $(nproc)"
+          free -h
+          echo "================"
+
+      - name: Setup Tmate
+        id: tmate
         uses: mxschmitt/action-tmate@v3
+        timeout-minutes: 15
         with:
           limit-access-to-actor: false
+          detached: true
+          connect-timeout-seconds: 180
+
+      - name: Show SSH Info
+        run: |
+          echo "=============================="
+          echo "SSH COMMAND:"
+          echo "${{ steps.tmate.outputs.ssh-command }}"
+          echo ""
+          echo "SSH ADDRESS:"
+          echo "${{ steps.tmate.outputs.ssh-address }}"
+          echo ""
+          echo "WEB:"
+          echo "${{ steps.tmate.outputs.web-url }}"
+          echo "=============================="
+
+      - name: Keep Runner Alive
+        run: |
+          while true; do
+            sleep 60
+          done
